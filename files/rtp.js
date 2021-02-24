@@ -180,10 +180,6 @@ chrome.tabs.query({
           ndiv.id = "ndiv"; // inside page activetab Elements
           ndiv.innerHTML = obj.name;
           document.body.append(ndiv); // nesta altura o popup.html "incha"
-          let udiv = document.createElement('div');
-          udiv.id = "udiv"; // inside page activetab Elements
-          udiv.innerHTML = obj.vurl;
-          document.body.append(udiv); // nesta altura o popup.html "incha"
         }
       }
     });
