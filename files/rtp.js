@@ -1,7 +1,7 @@
 /*
-2021-02-24
-1.09 lida com "{hls : atob(decodeURIComponent("
-1.10 idem, melhorado
+2021-03-02
+v 1.11 lida com "{hls : atob(decodeURIComponent("
+Código inchado, precisa refactoring!
 */
 // region {popup}
 let activeTabUrl;
@@ -21,10 +21,15 @@ chrome.tabs.query({
     document.getElementById("RTP_button").addEventListener('click', () => {
       // 
       function modifyDOM() {
+        //You can play with your DOM here or check URL against your regex
+        // this one logs in web page console
         let docBody = document.body.innerHTML;
         let resp = getUrlAndName(docBody);
         trueVideoUrl = resp.vurl;
         videoName = resp.name;
+        // inspirado em:
+        // https://gist.github.com/akirattii/2f55bb320f414becbc42bbe56313a28b
+        // este truque no fim, por meio do erro, envia o videoUrl correcto!!
         chrome.runtime.onMessage.addListener(
           function (request, sender, sendResponse) {
             if (request.cmd == "any command") {
@@ -33,6 +38,10 @@ chrome.tabs.query({
                 result: "any response from background"
               });
             } else {
+              // como o cmd !="any command" dá sempre "error"
+              // mas envia a message na mesma!
+              // o meu mal é que aqui só result: "error" é quee sta definido!
+              // parece que o resto não chegou aqui!
               let resp = {
                 result: "error",
                 vurl: trueVideoUrl,
@@ -79,19 +88,29 @@ chrome.tabs.query({
                 fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : decodeURIComponent("));
                 toIndex = docBody.indexOf("]", fromIndex) + 1;
                 preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
-                preVideoUrl = decodeURIComponent(eval('[' + preVideoUrl+ ']').join(""))
+                preVideoUrl = decodeURIComponent(eval('[' + preVideoUrl + ']').join(""))
                 preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
                 // amend mediaType:
                 mediaType = ".mp4"
                 break;
               case "atob(decodeURIComponent)":
                 fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : atob(decodeURIComponent("));
+                toIndex = docBody.indexOf("]", fromIndex) + 1;
+                preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
+                preVideoUrl = atob(decodeURIComponent(eval('[' + preVideoUrl + ']').join("")));
+                preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
+                // amend mediaType:
+                mediaType = ".mp4"
                 break;
               case ".mp4":
                 // Syntax: str.lastIndexOf(searchValue[, fromIndex])
                 fromIndex = docBody.indexOf("/master.m3u8");
                 backToIndex = docBody.lastIndexOf("https://", fromIndex)
                 preVideoUrl = docBody.substring(backToIndex, fromIndex);
+                // preVideoUrl = "https:" + docBody.split(token).pop().split(".m3u8")[0];
+                // https://streaming-ondemand.rtp.pt/nas2.share/h264/512x384/p6657/p6657_1_202012201253232792/master [.m3u8]
+                // que quero transformar em:
+                // https://ondemand.rtp.pt/nas2.share/h264/512x384/p6657/p6657_1_202012201253232792.mp4
                 break;
               case "contentUrl":
                 fromIndex = docBody.indexOf("_videoprv.mp4", docBody.indexOf("contentUrl"))
@@ -138,6 +157,7 @@ chrome.tabs.query({
         }
       }
       // end-region {popup}
+      //We have permission to access the activeTab, so we can call chrome.tabs.executeScript:
       chrome.tabs.executeScript({
         code: '(' + modifyDOM + ')();' //argument here is a string but function.toString() returns function's code
       }, (results) => {
