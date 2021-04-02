@@ -1,7 +1,6 @@
 /*
-2021-03-02
-v 1.11 lida com "{hls : atob(decodeURIComponent("
-Código inchado, precisa refactoring!
+2021-04-02
+v 1.12 lida com "{hls : atob( decodeURIComponent("
 */
 // region {popup}
 let activeTabUrl;
@@ -66,7 +65,9 @@ chrome.tabs.query({
           if (docBody.indexOf("{hls : decodeURIComponent(") > 0) {
             resp = prepURLandName("decodeURIComponent");
           } else if (docBody.indexOf("{hls : atob(decodeURIComponent(") > 0) {
-            resp = prepURLandName("atob(decodeURIComponent)");
+            resp = prepURLandName("atob( decodeURIComponent)");
+          } else if (docBody.indexOf("{hls : atob( decodeURIComponent(") > 0) {
+            resp = prepURLandName("atob( decodeURIComponent)");
           } else if (docBody.indexOf('"contentUrl":') > 0) {
             resp = prepURLandName("contentUrl");
           } else if (docBody.indexOf('content_type : "audio",') > 0) {
@@ -102,6 +103,15 @@ chrome.tabs.query({
                 // amend mediaType:
                 mediaType = ".mp4"
                 break;
+              case "atob( decodeURIComponent)":
+                fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : atob( decodeURIComponent("));
+                toIndex = docBody.indexOf("]", fromIndex) + 1;
+                preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
+                preVideoUrl = atob(decodeURIComponent(eval('[' + preVideoUrl + ']').join("")));
+                preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
+                // amend mediaType:
+                mediaType = ".mp4"
+                break;				
               case ".mp4":
                 // Syntax: str.lastIndexOf(searchValue[, fromIndex])
                 fromIndex = docBody.indexOf("/master.m3u8");
