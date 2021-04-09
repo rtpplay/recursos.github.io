@@ -2,8 +2,8 @@
   "manifest_version": 2,
   "name": "RTP Play download Extension",
   "description": "Download vídeos da RTP Play",
-  "version": "1.12",
-  "author": "recursos.pt@gmail.com 2021-04-02",
+  "version": "1.15",
+  "author": "2021-04-08 @recursos créditos: @cisnemania",
 
 "browser_action": {
     "default_title": "RTP Play download",

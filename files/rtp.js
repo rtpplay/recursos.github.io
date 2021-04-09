@@ -1,6 +1,5 @@
 /*
-2021-04-02
-v 1.12 lida com "{hls : atob( decodeURIComponent("
+v 1.15 algoritmo - créditos: @cisnemania
 */
 // region {popup}
 let activeTabUrl;
@@ -59,70 +58,33 @@ chrome.tabs.query({
             vurl: "",
             name: "",
           };
-          const style1 = "streaming-ondemand";
-          const style2 = "ondemand-streaming";
+          videoName = getVName(docBody);
+          docBody = docBody.replace(/\s+/g, '');
           // which case?
-          if (docBody.indexOf("{hls : decodeURIComponent(") > 0) {
-            resp = prepURLandName("decodeURIComponent");
-          } else if (docBody.indexOf("{hls : atob(decodeURIComponent(") > 0) {
-            resp = prepURLandName("atob( decodeURIComponent)");
-          } else if (docBody.indexOf("{hls : atob( decodeURIComponent(") > 0) {
-            resp = prepURLandName("atob( decodeURIComponent)");
-          } else if (docBody.indexOf('"contentUrl":') > 0) {
-            resp = prepURLandName("contentUrl");
-          } else if (docBody.indexOf('content_type : "audio",') > 0) {
-            resp = prepURLandName(".mp3");
+          if(docBody.indexOf('"contentUrl":') > 0) {
+            videoUrl = prepURLandName("contentUrl");
+          } else if (docBody.indexOf('content_type:"audio",') > 0) {
+            videoUrl = prepURLandName(".mp3");
           } else if (docBody.indexOf('.m3u8') > 0) {
-            resp = prepURLandName(".mp4");
+            videoUrl = prepURLandName(".mp4");
           } else {
             console.error("nem um nem outro?");
             // check new RTP Play strategies:
           }
+          resp = {
+            vurl: videoUrl,
+            name: videoName,
+          };
           return resp;
           //
           // extract URL and name from page body
           function prepURLandName(mediaType) {
             let trueVideoUrl = "";
             let preVideoUrl = "";
+            const style1 = "streaming";
+            const style2 = "streaming-arquivo";
             switch (mediaType) {
-              case "decodeURIComponent":
-                fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : decodeURIComponent("));
-                toIndex = docBody.indexOf("]", fromIndex) + 1;
-                preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
-                preVideoUrl = decodeURIComponent(eval('[' + preVideoUrl + ']').join(""))
-                preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
-                // amend mediaType:
-                mediaType = ".mp4"
-                break;
-              case "atob(decodeURIComponent)":
-                fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : atob(decodeURIComponent("));
-                toIndex = docBody.indexOf("]", fromIndex) + 1;
-                preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
-                preVideoUrl = atob(decodeURIComponent(eval('[' + preVideoUrl + ']').join("")));
-                preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
-                // amend mediaType:
-                mediaType = ".mp4"
-                break;
-              case "atob( decodeURIComponent)":
-                fromIndex = docBody.indexOf("[", docBody.indexOf("{hls : atob( decodeURIComponent("));
-                toIndex = docBody.indexOf("]", fromIndex) + 1;
-                preVideoUrl = docBody.substring(fromIndex + 1, toIndex - 1);
-                preVideoUrl = atob(decodeURIComponent(eval('[' + preVideoUrl + ']').join("")));
-                preVideoUrl = preVideoUrl.replace("/master.m3u8", "");
-                // amend mediaType:
-                mediaType = ".mp4"
-                break;				
-              case ".mp4":
-                // Syntax: str.lastIndexOf(searchValue[, fromIndex])
-                fromIndex = docBody.indexOf("/master.m3u8");
-                backToIndex = docBody.lastIndexOf("https://", fromIndex)
-                preVideoUrl = docBody.substring(backToIndex, fromIndex);
-                // preVideoUrl = "https:" + docBody.split(token).pop().split(".m3u8")[0];
-                // https://streaming-ondemand.rtp.pt/nas2.share/h264/512x384/p6657/p6657_1_202012201253232792/master [.m3u8]
-                // que quero transformar em:
-                // https://ondemand.rtp.pt/nas2.share/h264/512x384/p6657/p6657_1_202012201253232792.mp4
-                break;
-              case "contentUrl":
+               case "contentUrl":
                 fromIndex = docBody.indexOf("_videoprv.mp4", docBody.indexOf("contentUrl"))
                 backToIndex = docBody.lastIndexOf("https://", fromIndex)
                 preVideoUrl = docBody.substring(backToIndex, fromIndex);
@@ -138,10 +100,13 @@ chrome.tabs.query({
             }
             // alguma limpeza
             preVideoUrl = preVideoUrl.replace("preview/", "")
-            preVideoUrl = preVideoUrl.replace("cdn-ondemand", style1)
+            preVideoUrl = preVideoUrl.replace("cdn", style1)
             preVideoUrl = preVideoUrl.replace(style1, style2); // se ".mp3" é inócuo
             trueVideoUrl = preVideoUrl + mediaType;
-            preTitle = docBody.match('(?<=<meta itemprop="name" content=)(.*)(?=>)');
+            return trueVideoUrl;
+          }
+          function getVName(body) {
+            preTitle = body.match('(?<=<meta itemprop="name" content=)(.*)(?=>)');
             /*
             content_type : "video", COULD ALSO BE: content_type : "audio",
             content_title : "Glumpers",
@@ -149,20 +114,18 @@ chrome.tabs.query({
             content_date: "2020-12-29"
             content_img : 
             */
-            let contentTitle = docBody.match('(?<=content_title : ")(.*)(?=",)');
-            let contentEpisode = docBody.match('(?<=content_episode : ")(.*)(?=",)');
+            let contentTitle = body.match('(?<=content_title : ")(.*)(?=",)');
+            let contentEpisode = body.match('(?<=content_episode : ")(.*)(?=",)');
             let prefix = ""
             if (contentEpisode[0] != "") {
               prefix = `EP${contentEpisode[0]}-`;
             }
             let contentDate = docBody.match('(?<=content_date: ")(.*)(?=",)');
-            let videoName = `${prefix}${contentTitle[0]}-${contentDate[0]}`;
-            videoName = videoName.replace(":", "-");
+            let vName = `${prefix}${contentTitle[0]}-${contentDate[0]}`;
+            viName = vName.replace(":", "-");
             // vamos livrar-nos de coisas más dentro do "name":
-            videoName = videoName.replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, '') + mediaType; //".mp4";
-            resp.vurl = trueVideoUrl;
-            resp.name = videoName;
-            return resp;
+            vName = vName.replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, '') + ".mp4";
+            return vName;
           }
         }
       }
