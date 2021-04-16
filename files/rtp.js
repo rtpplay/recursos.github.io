@@ -1,5 +1,5 @@
 /*
-v 1.15 algoritmo - créditos: @cisnemania
+v 1.17 reversão para atob( simplificada [astúcia - créditos: @cisnemania]
 */
 // region {popup}
 let activeTabUrl;
@@ -54,55 +54,48 @@ chrome.tabs.query({
           });
         // from <body>..</body> estract video url and video title
         function getUrlAndName(docBody) {
-          let resp = {
-            vurl: "",
-            name: "",
-          };
           videoName = getVName(docBody);
-          docBody = docBody.replace(/\s+/g, '');
           // which case?
-          if(docBody.indexOf('"contentUrl":') > 0) {
-            videoUrl = prepURLandName("contentUrl");
-          } else if (docBody.indexOf('content_type:"audio",') > 0) {
-            videoUrl = prepURLandName(".mp3");
-          } else if (docBody.indexOf('.m3u8') > 0) {
-            videoUrl = prepURLandName(".mp4");
+          docBody = docBody.replace(/\s+/g, '');
+          if (docBody.indexOf("fileKey:atob(decodeURIComponent(") > 0) {
+            videoUrl = getURL(docBody, "fileKey:atob(");
+          } else if (docBody.indexOf('fileKey:"/') > 0) {
+            videoUrl = getURL(docBody, 'fileKey:"/');
           } else {
             console.error("nem um nem outro?");
             // check new RTP Play strategies:
           }
-          resp = {
+          let resp = {
             vurl: videoUrl,
             name: videoName,
           };
           return resp;
           //
-          // extract URL and name from page body
-          function prepURLandName(mediaType) {
+          // extract URL from page body
+          function getURL(body, type) {
             let trueVideoUrl = "";
             let preVideoUrl = "";
-            const style1 = "streaming";
-            const style2 = "streaming-arquivo";
-            switch (mediaType) {
-               case "contentUrl":
-                fromIndex = docBody.indexOf("_videoprv.mp4", docBody.indexOf("contentUrl"))
-                backToIndex = docBody.lastIndexOf("https://", fromIndex)
-                preVideoUrl = docBody.substring(backToIndex, fromIndex);
-                // amend mediaType:
-                mediaType = ".mp4"
+            let tmpVideoUrl = "";
+            const preface = '"aHR0cHM","6Ly9zdH","JlYW1pb","mctYXJx","dWl2by1","vbmRlbW","FuZC5yd","HAucHQv",'
+            switch (type) {
+              case "fileKey:atob(":
+                fromIndex = body.indexOf("[", body.indexOf("fileKey:atob(decodeURIComponent("));
+                toIndex = body.indexOf("]", fromIndex) + 1;
+                preVideoUrl = body.substring(fromIndex + 1, toIndex - 1);
+                preVideoUrl = preface + preVideoUrl;
+                trueVideoUrl = atob(decodeURIComponent(eval('[' + preVideoUrl + ']').join("")));
                 break;
-              case ".mp3":
-                // "https://cdn-ondemand.rtp.pt/nas2.share/wavrss/at3/2102/PGM2100403403401_355271-2102161509.mp3"
-                fromIndex = docBody.indexOf(".mp3"); // preVideoUrl = docBody.split('file: "').pop().split('.mp3')[0];
-                backToIndex = docBody.lastIndexOf("https://", fromIndex)
-                preVideoUrl = docBody.substring(backToIndex, fromIndex);
+              case 'fileKey:"/':
+                fromIndex = body.indexOf('fileKey:"/');
+                toIndex = body.indexOf(",", fromIndex) + 1;
+                preVideoUrl = body.substring(fromIndex + ('fileKey:"').length, toIndex - 2);
+                tmpVideoUrl = encodeURIComponent(btoa(preVideoUrl)).split(/(.{7})/).filter(O => O)
+                tmpVideoUrl = tmpVideoUrl.toString();
+                tmpVideoUrl = '"' + tmpVideoUrl.replace(/,/g, '","') + '"';
+                tmpVideoUrl = preface + tmpVideoUrl;
+                trueVideoUrl = atob(decodeURIComponent(eval('[' + tmpVideoUrl + ']').join("")));
                 break;
             }
-            // alguma limpeza
-            preVideoUrl = preVideoUrl.replace("preview/", "")
-            preVideoUrl = preVideoUrl.replace("cdn", style1)
-            preVideoUrl = preVideoUrl.replace(style1, style2); // se ".mp3" é inócuo
-            trueVideoUrl = preVideoUrl + mediaType;
             return trueVideoUrl;
           }
           function getVName(body) {
@@ -122,7 +115,7 @@ chrome.tabs.query({
             }
             let contentDate = docBody.match('(?<=content_date: ")(.*)(?=",)');
             let vName = `${prefix}${contentTitle[0]}-${contentDate[0]}`;
-            viName = vName.replace(":", "-");
+            vName = vName.replace(":", "-");
             // vamos livrar-nos de coisas más dentro do "name":
             vName = vName.replace(/[&\/\\#,+()$~%.'":*?<>{}]/g, '') + ".mp4";
             return vName;
@@ -151,7 +144,10 @@ chrome.tabs.query({
               }
               let myVideoUrl = obj.vurl;
               let videoName = obj.name;
+			  /*
+              // REMOVER, NÃO FAZ PARTE DO PRODUTO FINAL!
               injectXdiv(obj); // this is in popup.html and adds (several) <div class="
+			  */
               // testar em OPERA e Firefox
               chrome.downloads.download({
                 url: myVideoUrl,
@@ -166,6 +162,7 @@ chrome.tabs.query({
           });
         });
       });
+      // REMOVER, NÃO FAZ PARTE DO PRODUTO FINAL!
       // function injectXdiv(xurl = "<strong>Hi there!</strong> inside popup.") {
       function injectXdiv(obj) {
         if (exists = document.getElementById("ndiv") == null) {
@@ -173,6 +170,10 @@ chrome.tabs.query({
           ndiv.id = "ndiv"; // inside page activetab Elements
           ndiv.innerHTML = obj.name;
           document.body.append(ndiv); // nesta altura o popup.html "incha"
+          let udiv = document.createElement('div');
+          udiv.id = "udiv"; // inside page activetab Elements
+          udiv.innerHTML = obj.vurl;
+          document.body.append(udiv); // nesta altura o popup.html "incha"
         }
       }
     });
